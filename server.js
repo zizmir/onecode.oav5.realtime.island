@@ -2,16 +2,16 @@ import express from "express";
 import socketIo from "socket.io";
 import path from "path";
 import { createServer } from "http";
-import fs from "fs";
 import { argv, mlog } from "./libs/utils";
 import { constMN } from "./constants/constGames";
+import manageGame from "./manageGame";
+
+let games = require("./games.json");
+let counter = { COUNT_GAMERS_MAGIC_NUMBER: 0 };
 
 // Instantiate express application
 const app = express();
 
-let countUserInGames = {
-  COUNT_GAMERS_MAGIC_NUMBER: 0
-};
 // Setting the application port depending to environment
 const port = parseInt(argv[0], 10) || process.env.PORT;
 
@@ -33,16 +33,18 @@ const start = async () => {
 
       mlog(`Server is running on port ${port}`);
     });
-
+    // GESTION GAMERS
     io.on("connection", socket => {
       mlog("client connected", "yellow");
 
       socket.on("disconnect", () => {
         mlog("client disconnected", "yellow");
       });
+      // connect to platform
+      socket.on("join", name => {
+        // check if file exists
 
-      socket.on("join", nickname => {
-        console.log(`${nickname} has joined the channel`);
+        console.log(`${name} has joined the channel`);
         io.emit("hello", "Welcome to the jungle!");
       });
 
@@ -56,30 +58,28 @@ const start = async () => {
     // OPEN GAME
     ioMagicNumber.on("connection", socket => {
       //user join the game
-      socket.on("join", nickname => {
-        console.log(nickname);
+      socket.on("join", name => {
+        manageGame.addNewGamers(ioMagicNumber, name, "magicNumber", socket);
         // increment number of user connected
-        countUserInGames.COUNT_GAMERS_MAGIC_NUMBER++;
-        // saved the name of user
-        socket.nickname = nickname;
-
+        // saved the name of gamer
+        counter.COUNT_GAMERS_MAGIC_NUMBER++;
         socket.emit(
           "boot",
-          `[BOOT] Welcome ${nickname}  ! In the game : Magic Number`
+          `[BOOT] Welcome ${name}  ! In the game : Magic Number`
         );
         socket.broadcast.emit(
           "boot",
-          `[BOOT] ${socket.nickname} has joined the game! `
+          `[BOOT] ${socket.name} has joined the game! `
         );
       });
 
       socket.on("try", value => {
-        console.log(countUserInGames.COUNT_GAMERS_MAGIC_NUMBER);
         // change the number 1 by const ""< MIN_USER_AUTHORIZED_IN_ROOM" if your are not alone
-        if (countUserInGames.COUNT_GAMERS_MAGIC_NUMBER >= 1) {
+        if (counter.COUNT_GAMERS_MAGIC_NUMBER >= 1) {
           // if number is higher of min user connect send a message for user connect and the other
-          console.log(countUserInGames.COUNT_GAMERS_MAGIC_NUMBER);
-          console.log(socket.nickname);
+          console.log(counter.COUNT_GAMERS_MAGIC_NUMBER);
+
+          console.log(socket.name);
 
           socket.broadcast.emit("response", "The game started !");
           ioMagicNumber.emit(
@@ -89,15 +89,11 @@ const start = async () => {
 
           if (magicNumber == value) {
             ioMagicNumber.emit("response", "😎 You win !!");
+            manageGame.addPointsForUser(socket.name, "magicNumber");
             socket.broadcast.emit(
               "boot",
-              `😠 Damn! the gamers ${socket.nickname} find the number `
+              `😠 Damn! the gamers ${socket.name} find the number `
             );
-            if (fs.existsSync("./games.json")) {
-              ioMagicNumber.emit("exist", true);
-            } else {
-              ioMagicNumber.emit("exist", false);
-            }
           }
           if (magicNumber < value) {
             ioMagicNumber.emit("boot", "😱 To upper");
@@ -112,8 +108,13 @@ const start = async () => {
       });
 
       socket.on("disconnect", () => {
-        countUserInGames.COUNT_GAMERS_MAGIC_NUMBER--;
+        counter.COUNT_GAMERS_MAGIC_NUMBER--;
 
+        manageGame.deleteGamer(socket.name, "magicNumber");
+        socket.broadcast.emit(
+          "boot",
+          `[BOOT]! the gamers ${socket.name} leave the game `
+        );
         mlog("client disconnected", "yellow");
       });
     });

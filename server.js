@@ -7,7 +7,6 @@ import { constMN } from "./constants/constGames";
 import manageGame from "./manageGame";
 
 let games = require("./games.json");
-let counter = { COUNT_GAMERS_MAGIC_NUMBER: 0 };
 
 // Instantiate express application
 const app = express();
@@ -59,10 +58,14 @@ const start = async () => {
     ioMagicNumber.on("connection", socket => {
       //user join the game
       socket.on("join", name => {
+        // count number of players
+        if (ioMagicNumber.COUNT_GAMERS_MAGIC_NUMBER === undefined) {
+          ioMagicNumber.COUNT_GAMERS_MAGIC_NUMBER = 1;
+        }
         manageGame.addNewGamers(ioMagicNumber, name, "magicNumber", socket);
         // increment number of user connected
         // saved the name of gamer
-        counter.COUNT_GAMERS_MAGIC_NUMBER++;
+        ioMagicNumber.COUNT_GAMERS_MAGIC_NUMBER++;
         socket.emit(
           "boot",
           `[BOOT] Welcome ${name}  ! In the game : Magic Number`
@@ -74,12 +77,11 @@ const start = async () => {
       });
 
       socket.on("try", value => {
-        // change the number 1 by const ""< MIN_USER_AUTHORIZED_IN_ROOM" if your are not alone
-        if (counter.COUNT_GAMERS_MAGIC_NUMBER >= 1) {
+        if (
+          ioMagicNumber.COUNT_GAMERS_MAGIC_NUMBER >=
+          constMN.MIN_USER_AUTHORIZED_IN_ROOM
+        ) {
           // if number is higher of min user connect send a message for user connect and the other
-          console.log(counter.COUNT_GAMERS_MAGIC_NUMBER);
-
-          console.log(socket.name);
 
           socket.broadcast.emit("response", "The game started !");
           ioMagicNumber.emit(
@@ -108,7 +110,106 @@ const start = async () => {
       });
 
       socket.on("disconnect", () => {
-        counter.COUNT_GAMERS_MAGIC_NUMBER--;
+        ioMagicNumber.COUNT_GAMERS_MAGIC_NUMBER--;
+
+        manageGame.deleteGamer(socket.name, "magicNumber");
+        socket.broadcast.emit(
+          "boot",
+          `[BOOT]! the gamers ${socket.name} leave the game `
+        );
+        mlog("client disconnected", "yellow");
+      });
+    });
+
+    // GAME Quickey
+    let ioQuickey = io.of("/quickey");
+    // OPEN GAME
+    ioQuickey.on("connection", socket => {
+      //user join the game
+      socket.on("join", name => {
+        if (ioQuickey.COUNT_GAMERS_QUICK_KEY === undefined) {
+          ioQuickey.COUNT_GAMERS_QUICK_KEY = 1;
+        }
+        ioQuickey.COUNT_GAMERS_QUICK_KEY++;
+
+        if (ioQuickey.lock) {
+          socket.emit(
+            "boot",
+            `You cannot access a game who started ! Please wait the end of game`
+          );
+        } else {
+          // Generate a counter key press for all player
+          socket.counterKeyPress = 0;
+
+          console.log(socket.name);
+          // manageGame.addNewGamers(ioQuickey, name, "quicKey", socket);
+          // increment number of user connected
+          // saved the name of gamer
+          socket.name = name;
+
+          socket.emit(
+            "boot",
+            `[BOOT] Welcome ${name}  ! In the game : Quick key`
+          );
+          socket.broadcast.emit(
+            "boot",
+            `[BOOT] ${socket.name} has joined the game! `
+          );
+        }
+      });
+
+      socket.on("try", value => {
+        console.log(ioQuickey.COUNT_GAMERS_QUICK_KEY);
+
+        // change the number 1 by const "" if your are not alone
+        if (
+          ioQuickey.COUNT_GAMERS_QUICK_KEY >=
+          constMN.MIN_USER_AUTHORIZED_IN_ROOM
+        ) {
+          // if number is higher of min user connect send a message for user connect and the other
+          // unlock the game
+          ioQuickey.lock = true;
+
+          // create
+          socket.broadcast.emit("response", "The game started !");
+          // save key in socket game
+          let obj = { beg: new Date() };
+          ioQuickey.key = Math.floor(Math.random() * 26) + 97;
+          ioQuickey.emit(
+            "boot",
+            `Spam the key  ${String.fromCharCode(ioQuickey.key)} !`
+          );
+          setTimeout(function() {
+            // unlock the game
+            ioQuickey.lock = false;
+            // save the end of game
+            obj.end = new Date();
+
+            socket.emit("Boot", "Times up!");
+            socket.broadcast.emit("Boot", "Times up!");
+            // count number points
+            for (var variable in ioQuickey.counterKeyPress.player) {
+              if (object.hasOwnProperty(variable)) {
+              }
+            }
+            if (ioQuickey.key == value) socket.counterKeyPress++;
+
+            // add points
+            // manageGame.addPointsForUser(socket.name, "quicKey");
+          }, 42000);
+
+          socket.broadcast.emit(
+            "boot",
+            `😠 Damn! the gamers ${socket.name} find the number `
+          );
+        } else {
+          console.log("waiting challenger");
+          ioQuickey.emit("boot", "Waiting challenger ....");
+        }
+      });
+
+      socket.on("disconnect", () => {
+        ioQuickey.COUNT_GAMERS_QUICK_KEY--;
 
         manageGame.deleteGamer(socket.name, "magicNumber");
         socket.broadcast.emit(

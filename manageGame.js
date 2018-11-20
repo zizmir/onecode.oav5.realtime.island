@@ -30,8 +30,6 @@ class manageGame {
             // this.counter[nbrGamers]++;
           }
         );
-
-        socket.name = name;
       }
     } else {
       throw "the file gamers.json doesn't exist";
@@ -61,7 +59,6 @@ class manageGame {
     let gamer = games[kindOfGame][0].players.filter(function(gamer) {
       return gamer.name == name;
     });
-    console.log(gamer);
     addNewGamers[kindOfGame][0].players.push({
       name,
       points: 0
